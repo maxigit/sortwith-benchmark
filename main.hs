@@ -105,4 +105,4 @@ main = defaultMain
                      , bench "vector-direct"    $ nf sort5 n
                      , bench "vector-pre"    $ nf sort4 n
                      ]
-    | n <- [8,12,16]]
+    | n <- [4, 8,12]]
