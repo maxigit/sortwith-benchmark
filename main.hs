@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- * Purpose
 {-
 Sorting a list using `on compare f` result in  f being called
@@ -20,13 +21,19 @@ Example 0 1 2 3 4 5 6 7 => 0 4 2 6 1 5 3 7
 -- * Methods
 -- We'll use `Criterion` to do the benchmark
 
--- import Criterion.Main
+import Criterion.Main
 
 --  And of course we need the `on` function
 import Data.Function(on)
 
 --  and sort ....
 import Data.List (sortBy, unfoldr)
+import GHC.Exts (sortWith)
+import Control.Monad.ST
+import Control.Monad
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as V
+import qualified Data.Vector.Algorithms.Intro as V
 
 import Data.Tuple (swap)
 -- **  Bit-Reverse extraction
@@ -45,10 +52,41 @@ toBitR n = reverse $ toBit n
 sort1 :: Int -> [Int]
 sort1 n = sortBy (compare `on` toBitR) [0..(2^n)-1]
 
-{-
-== Precompute all values
-== Use of Memoize library
--}
+-- ** Precompute all values
+sort2 ::  Int -> [Int]
+sort2 n = sortOn toBitR [0..(2^n)-1]
+
+sortOn :: Ord k => (a -> k) -> [a] -> [a]
+sortOn f xs = map snd $ sortBy (compare `on` fst) [(f x, x) | x <- xs]
+
+sort3 :: Int -> [Int]
+sort3 n = sortWith toBitR [0..(2^n)-1]
+-- ** Vector
+sort4 :: Int -> [Int]
+sort4 n = sortV toBitR [0..(2^n)-1]
+
+sortV :: forall a k . Ord k => (a -> k) -> [a] -> [a]
+sortV f xs = let
+    v :: ST s (V.STVector s (k, a)) 
+    v = do
+        v <- V.new (length xs)
+        zipWithM_ (\x i  ->
+                    V.write v i (f x, x)
+                  ) xs [0..]
+        V.sortBy (compare `on` fst) v
+        return v
+    sorted = runST $ V.unsafeFreeze =<< v :: V.Vector (k, a)
+    in map snd (V.toList sorted)
+    
+-- **  Use of Memoize library
+--
+-- ** Main
 
 main:: IO ()
-main = undefined
+main = defaultMain
+    [ bgroup ("sort 2^" ++ show n)  [ bench "normal" $ nf sort1 n
+                     , bench "pre"    $ nf sort2 n
+                     , bench "with"    $ nf sort3 n
+                     , bench "vector"    $ nf sort4 n
+                     ]
+    | n <- [8, 12]]
