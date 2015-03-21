@@ -63,21 +63,36 @@ sort3 :: Int -> [Int]
 sort3 n = sortWith toBitR [0..(2^n)-1]
 -- ** Vector
 sort4 :: Int -> [Int]
-sort4 n = sortV toBitR [0..(2^n)-1]
+sort4 n = map snd  $ sortV (\x ->  (toBitR x, x)) [0..(2^n)-1]
 
-sortV :: forall a k . Ord k => (a -> k) -> [a] -> [a]
+
+
+sortV :: forall a b . Ord b => (a -> b) -> [a] -> [b]
 sortV f xs = let
-    v :: ST s (V.STVector s (k, a)) 
+    v :: ST s (V.STVector s b) 
     v = do
         v <- V.new (length xs)
         zipWithM_ (\x i  ->
-                    V.write v i (f x, x)
+                    V.write v i (f x)
                   ) xs [0..]
-        V.sortBy (compare `on` fst) v
+        V.sort v
         return v
-    sorted = runST $ V.unsafeFreeze =<< v :: V.Vector (k, a)
-    in map snd (V.toList sorted)
+    in V.toList ( runST $ V.unsafeFreeze =<< v :: V.Vector b)
     
+sort5 :: Int -> [Int]
+sort5 n = sortV' (compare `on` toBitR)  [0..(2^n)-1]
+sortV' :: forall a . (V.Comparison a) ->  [a] -> [a]
+sortV' f xs = let
+    v :: ST s (V.STVector s a) 
+    v = do
+        v <- V.new (length xs)
+        zipWithM_ (\x i  ->
+                    V.write v i x
+                  ) xs [0..]
+        V.sortBy f v
+        return v
+    in V.toList ( runST $ V.unsafeFreeze =<< v :: V.Vector a)
+
 -- **  Use of Memoize library
 --
 -- ** Main
@@ -87,6 +102,7 @@ main = defaultMain
     [ bgroup ("sort 2^" ++ show n)  [ bench "normal" $ nf sort1 n
                      , bench "pre"    $ nf sort2 n
                      , bench "with"    $ nf sort3 n
-                     , bench "vector"    $ nf sort4 n
+                     , bench "vector-direct"    $ nf sort5 n
+                     , bench "vector-pre"    $ nf sort4 n
                      ]
-    | n <- [8, 12]]
+    | n <- [8,12,16]]
