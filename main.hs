@@ -29,16 +29,23 @@ import Data.Function(on)
 import Data.List (sortBy, unfoldr)
 
 import Data.Tuple (swap)
--- *  Bit-Reverse extraction
+-- **  Bit-Reverse extraction
 toBit :: Int -> [Int]
 toBit n  = reverse $  unfoldr remainder n where
           remainder 0 = Nothing
           remainder x = Just . swap $ divMod x 2 
 
-{-
-== Normal Methods
-First, we need to verify how many times the function to compare on is called.
+toBitR :: Int -> [Int]
+toBitR n = reverse $ toBit n
 
+
+-- ** Normal Methods
+-- First, we need to verify how many times the function to compare on is called.
+
+sort1 :: Int -> [Int]
+sort1 n = sortBy (compare `on` toBitR) [0..(2^n)-1]
+
+{-
 == Precompute all values
 == Use of Memoize library
 -}
